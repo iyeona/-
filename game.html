@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>防詐終結對對碰</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome 圖示庫 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    /* 高齡適性視覺與高對比風格 */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background-color: #f1f5f9;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* 3D 翻牌視覺 */
+    .card-perspective {
+      perspective: 1000px;
+    }
+    
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      text-align: center;
+      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      transform-style: preserve-3d;
+      cursor: pointer;
+    }
+
+    .card-inner.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-front, .card-back {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+      border-radius: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+    }
+
+    /* 蓋牌正面 (尊榮高質感深藍) */
+    .card-front {
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+      border: 4px solid #ffffff;
+      color: white;
+      transform: rotateY(0deg);
+    }
+
+    /* 翻開背面 */
+    .card-back {
+      transform: rotateY(180deg);
+      background-color: #ffffff;
+    }
+
+    /* 🚨 詐騙陷阱卡 (高對比紅框) */
+    .card-problem {
+      border: 5px solid #dc2626;
+      background-color: #fff5f5;
+    }
+
+    /* 🛡️ 智慧防護卡 (高對比綠框) */
+    .card-solution {
+      border: 5px solid #16a34a;
+      background-color: #f0fdf4;
+    }
+
+    /* 配對成功（永久保留正面 + 耀眼綠框） */
+    .matched-card {
+      border-width: 6px !important;
+      border-color: #16a34a !important;
+      box-shadow: 0 0 25px rgba(22, 163, 74, 0.85) !important;
+      cursor: default !important;
+    }
+
+    /* 高齡友善大觸控按鈕 */
+    .btn-senior {
+      min-height: 52px;
+      touch-action: manipulation;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-900 flex flex-col justify-between p-3 sm:p-4 md:p-6">
+
+  <!-- 頂部頁首區塊 -->
+  <header class="w-full max-w-4xl mx-auto bg-red-700 text-white rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row justify-between items-center gap-3">
+    <div class="flex items-center gap-3 text-center sm:text-left">
+      <div class="bg-white text-red-700 w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-2xl sm:text-3xl shadow shrink-0 mx-auto sm:mx-0">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+      <div>
+        <!-- 統一標題 -->
+        <h1 class="text-2xl sm:text-3xl font-black tracking-wide">防詐終結對對碰</h1>
+        <p class="text-sm sm:text-base text-red-100 font-extrabold mt-0.5">翻牌 ｜ 聽語音 ｜ 認清防詐防護（50題庫 隨機抽3題）</p>
+      </div>
+    </div>
+
+    <!-- 語音切換與重新換題按鈕 -->
+    <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center">
+      <button id="tts-btn" onclick="toggleTTS()" class="btn-senior bg-amber-400 hover:bg-amber-500 active:scale-95 text-slate-900 font-black text-base sm:text-lg px-4 py-2 rounded-xl flex items-center gap-2 shadow-md">
+        <i id="tts-icon" class="fa-solid fa-volume-high text-xl"></i>
+        <span id="tts-text">語音：開啟</span>
+      </button>
+
+      <button onclick="restartGame()" class="btn-senior bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-base sm:text-lg px-4 py-2 rounded-xl flex items-center gap-2 shadow-md">
+        <i class="fa-solid fa-rotate-right text-xl"></i>
+        <span>換 3 題新題目</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 主遊戲區域 -->
+  <main class="w-full max-w-4xl mx-auto my-3 flex-1 flex flex-col items-center justify-center">
+
+    <!-- 進度與配對失敗 5 秒緩衝提示條 -->
+    <div class="w-full bg-white rounded-2xl p-3 sm:p-4 shadow-md border border-slate-200 mb-3 flex flex-wrap justify-between items-center gap-2 text-lg sm:text-xl font-black">
+      <div class="flex items-center gap-2 text-blue-900">
+        <i class="fa-solid fa-bullhorn text-xl sm:text-2xl text-blue-600"></i>
+        <span>進度：已完成配對 <span id="progress-text" class="text-2xl sm:text-3xl text-emerald-600 font-mono mx-1">0</span> / 3 組</span>
+      </div>
+
+      <!-- 配對失敗時出現的 5 秒閱讀提示 -->
+      <div id="delay-banner" class="hidden w-full sm:w-auto bg-amber-100 border-2 border-amber-400 text-amber-900 px-3 py-1.5 rounded-xl text-base sm:text-lg flex items-center justify-between gap-2">
+        <span class="font-bold">閱讀中</span>
+        <button onclick="forceFlipBack()" class="bg-amber-500 hover:bg-amber-600 text-slate-900 px-3 py-1 rounded-lg text-sm sm:text-base font-black shadow active:scale-95">
+          立刻蓋回卡片
+        </button>
+      </div>
+    </div>
+
+    <!-- 6 張卡片盤面 (手機版 2 欄 × 3 列 / 電腦平板 3 欄 × 2 列) -->
+    <div id="cards-grid" class="w-full grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 md:gap-5 my-auto">
+      <!-- 由 JavaScript 動態生成 6 張大卡片 -->
+    </div>
+
+  </main>
+
+  <!-- 頁尾 -->
+  <footer class="w-full max-w-4xl mx-auto text-center text-slate-600 font-bold text-xs sm:text-sm py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
+    <p>防詐終結對對碰</p>
+  </footer>
+
+  <!-- 通關歡慶 Modal 彈窗 -->
+  <div id="victory-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl border-4 border-emerald-500">
+      <div class="w-20 h-20 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center text-5xl mx-auto mb-3 border-4 border-amber-300 shadow-inner animate-bounce">
+        <i class="fa-solid fa-award"></i>
+      </div>
+      <h2 class="text-2xl sm:text-3xl font-black text-slate-900 mb-2">太棒了！順利通關！</h2>
+      <p class="text-lg font-bold text-slate-700 mb-4">您成功終結了本局所有的防詐陷阱！</p>
+      
+      <div class="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-3 mb-5 text-emerald-900 font-extrabold text-lg flex items-center justify-center gap-2">
+        <i class="fa-solid fa-circle-check text-2xl text-emerald-600"></i>
+        <span>榮獲「防詐大師」勳章 🏅</span>
+      </div>
+
+      <button onclick="closeVictoryModal(); restartGame();" class="w-full btn-senior bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xl py-3 rounded-2xl shadow-lg flex items-center justify-center gap-2">
+        <i class="fa-solid fa-play"></i> 重新再玩 3 題新題目
+      </button>
+    </div>
+  </div>
+
+  <!-- 🎮 遊戲邏輯與語音、音效控制腳本 -->
+  <script>
+    /* 1. 全全新 50 題高齡防詐題庫 (id: 1 ~ 50) */
+    const scamBank = [
+      {
+        id: 1,
+        qTitle: "簡訊通知領包裹，附帶未知網址",
+        qDesc: "點擊網址會洩漏銀行帳號與密碼！",
+        qIcon: "fa-envelope-open-text",
+        aTitle: "不點擊網址！聯繫官方客服求證",
+        aDesc: "簡訊內的網路連結通通不要點！",
+        aIcon: "fa-shield-halved"
+      },
+      {
+        id: 2,
+        qTitle: "電話哭喊：阿嬤！我出事急需用錢！",
+        qDesc: "歹徒假冒孫子哭鬧，要你立刻匯款救援！",
+        qIcon: "fa-phone-volume",
+        aTitle: "立刻掛斷！撥打親友舊號碼確認",
+        aDesc: "先掛斷電話，親自打原本的號碼求證！",
+        aIcon: "fa-phone-slash"
+      },
+      {
+        id: 3,
+        qTitle: "飆股內線群組，宣稱保證高獲利！",
+        qDesc: "標榜穩賺不賠、老師帶盤全是詐騙陷阱！",
+        qIcon: "fa-arrow-trend-up",
+        aTitle: "不聽信穩賺！絕不隨意匯款轉帳",
+        aDesc: "天下沒有白吃的午餐，堅決不轉帳匯款！",
+        aIcon: "fa-piggy-bank"
+      },
+      {
+        id: 4,
+        qTitle: "假警察：你涉及洗錢要監管帳戶！",
+        qDesc: "恐嚇涉及刑事案件，要求交出存摺與密碼！",
+        qIcon: "fa-user-ninja",
+        aTitle: "警察不會要求轉帳！打165求證",
+        aDesc: "立刻掛斷電話，並打 165 反詐專線求證！",
+        aIcon: "fa-user-shield"
+      },
+      {
+        id: 5,
+        qTitle: "電話通知健保卡異常鎖卡！",
+        qDesc: "聲稱違規領藥，要求在電話中核對帳號！",
+        qIcon: "fa-id-card",
+        aTitle: "健保局不會電話要帳號！",
+        aDesc: "請親自臨櫃辦理或撥打健保官方電話！",
+        aIcon: "fa-hospital-user"
+      },
+      {
+        id: 6,
+        qTitle: "電話指示去 ATM 操作解除設定！",
+        qDesc: "謊稱網購扣款錯誤，要你去提款機按密碼！",
+        qIcon: "fa-money-bill-transfer",
+        aTitle: "ATM 沒有解除設定功能！",
+        aDesc: "凡是聽電話指示操作 ATM 就是詐騙！",
+        aIcon: "fa-ban"
+      },
+      {
+        id: 7,
+        qTitle: "通知抽中大獎！需先繳納稅金",
+        qDesc: "要求先匯款幾千元手續費才能領取獎品！",
+        qIcon: "fa-gift",
+        aTitle: "要求先匯款繳稅都是詐騙！",
+        aDesc: "真正中獎絕不會要求預先匯款保證金！",
+        aIcon: "fa-trophy"
+      },
+      {
+        id: 8,
+        qTitle: "假瓦斯安檢，現場強行收費！",
+        qDesc: "強行安裝便宜開關零件並現場要拿現金！",
+        qIcon: "fa-fire-burner",
+        aTitle: "查看證件！向官方核實不給錢",
+        aDesc: "正規檢修費用會併入下期瓦斯繳費單！",
+        aIcon: "fa-file-invoice"
+      },
+      {
+        id: 9,
+        qTitle: "收到電費未繳簡訊，限時1小時切斷",
+        qDesc: "簡訊附帶假電力公司網址誘騙信用卡號！",
+        qIcon: "fa-bolt",
+        aTitle: "打電力公司官方客服或165查詢",
+        aDesc: "不點簡訊連結，直接撥打台電客服1911！",
+        aIcon: "fa-headset"
+      },
+      {
+        id: 10,
+        qTitle: "AI 複製親友聲音電話求救借錢！",
+        qDesc: "聲音跟兒女一模一樣，急喊車禍要匯款！",
+        qIcon: "fa-robot",
+        aTitle: "通話中問家內密語，掛斷打舊號",
+        aDesc: "詢問只有家人知道的私密問題或原號求證！",
+        aIcon: "fa-circle-question"
+      },
+      {
+        id: 11,
+        qTitle: "一頁式廣告特價神藥，買一送一！",
+        qDesc: "宣稱根治慢性病，收到卻是劣質雜牌！",
+        qIcon: "fa-prescription-bottle-medical",
+        aTitle: "不買源頭不明藥物！看診拿藥最安全",
+        aDesc: "網路誇大療效多為詐騙，買藥認明藥局！",
+        aIcon: "fa-stethoscope"
+      },
+      {
+        id: 12,
+        qTitle: "假社工關懷，索取存摺與印章！",
+        qDesc: "聲稱幫忙申請長照補助，要帶走銀行存簿！",
+        qIcon: "fa-hands-holding-child",
+        aTitle: "絕不交出存摺印章！向社會局確認",
+        aDesc: "政府社工絕不會拿取您的私房存摺與印章！",
+        aIcon: "fa-vault"
+      },
+      {
+        id: 13,
+        qTitle: "簡訊通知交通違規罰單未繳納！",
+        qDesc: "附帶假的監理站連結，要求線上輸入信用卡！",
+        qIcon: "fa-car-burst",
+        aTitle: "上官方監理服務網查詢，不點連結",
+        aDesc: "認明gov.tw官方網址，不隨意輸入卡號！",
+        aIcon: "fa-laptop-code"
+      },
+      {
+        id: 14,
+        qTitle: "電信紅利點數即將到期，快換禮品",
+        qDesc: "簡訊誘導進入假網站，騙取信用卡OTP密碼！",
+        qIcon: "fa-award",
+        aTitle: "打開官方電信App查看點數！",
+        aDesc: "不點未知簡訊連結，卡號驗證碼絕不外流！",
+        aIcon: "fa-mobile-screen-button"
+      },
+      {
+        id: 15,
+        qTitle: "LINE好友傳訊：幫我寵物投票點連結",
+        qDesc: "點開要求輸入電話與驗證碼，帳號秒被盜！",
+        qIcon: "fa-square-poll-vertical",
+        aTitle: "不填驗證碼！打電話給好友確認",
+        aDesc: "任何要求輸入驗證碼的投票都是詐騙話術！",
+        aIcon: "fa-user-lock"
+      },
+      {
+        id: 16,
+        qTitle: "宣稱律師團隊，能幫忙追回被詐扣款！",
+        qDesc: "要求先付幾萬元「二次追討手續費」！",
+        qIcon: "fa-scale-balanced",
+        aTitle: "二次追討全是二次詐騙！找警察求助",
+        aDesc: "網路自稱能追回詐款的幾乎全都是騙子！",
+        aIcon: "fa-handcuffs"
+      },
+      {
+        id: 17,
+        qTitle: "水費逾期未繳，將於今日執行停水！",
+        qDesc: "簡訊附帶假水公司網址騙取信用卡轉帳！",
+        qIcon: "fa-droplet",
+        aTitle: "撥打水公司官方電話1910查詢",
+        aDesc: "自來水公司不會發帶連結的停水催繳簡訊！",
+        aIcon: "fa-phone-volume"
+      },
+      {
+        id: 18,
+        qTitle: "宣稱政府普發現金，點連結領取！",
+        qDesc: "冒用政府機關網頁，要求輸入身份證與帳號！",
+        qIcon: "fa-hand-holding-dollar",
+        aTitle: "認明政府結尾網址 .gov.tw！",
+        aDesc: "政府不會傳簡訊要你點連結領現金！",
+        aIcon: "fa-building-columns"
+      },
+      {
+        id: 19,
+        qTitle: "網路黃金/加密貨幣投資，保證日派彩！",
+        qDesc: "誘騙長者將退休金投入虛擬幣私下平台！",
+        qIcon: "fa-coins",
+        aTitle: "不懂的投資絕不碰！守護老本",
+        aDesc: "來源不明的加密平台多為後台操控陷阱！",
+        aIcon: "fa-shield-cat"
+      },
+      {
+        id: 20,
+        qTitle: "電視購物重複扣款，客服來電辦退款",
+        qDesc: "要求給銀行客服電話，進行遠端轉帳輔導！",
+        qIcon: "fa-tv",
+        aTitle: "來電顯示有+號全是境外詐騙！",
+        aDesc: "客服絕不會要求顧客操作網路銀行退款！",
+        aIcon: "fa-square-phone"
+      },
+      {
+        id: 21,
+        qTitle: "簡訊通知 eTag 國道通行費欠繳！",
+        qDesc: "假冒遠通電收，點入騙取信用卡號！",
+        qIcon: "fa-road",
+        aTitle: "開啟 eTag 官方 App 查詢繳費！",
+        aDesc: "不安裝不明簡訊附帶的網址連結！",
+        aIcon: "fa-mobile-retro"
+      },
+      {
+        id: 22,
+        qTitle: "假宮廟神明加持，賣昂貴開運佛珠！",
+        qDesc: "利用長者求平安心理，強售萬元無價紀念品！",
+        qIcon: "fa-hands-praying",
+        aTitle: "心誠則靈，不花大錢買無證文物",
+        aDesc: "信仰講求心安，避免隨意聽信陌生推銷！",
+        aIcon: "fa-heart"
+      },
+      {
+        id: 23,
+        qTitle: "假郵局包裹貨到付款，要家人代收！",
+        qDesc: "配送空盒或劣質品，要求現場支付高額現金！",
+        qIcon: "fa-box",
+        aTitle: "未訂購商品拒絕簽收與付款！",
+        aDesc: "先向家人確認是否有買東西再付錢！",
+        aIcon: "fa-circle-xmark"
+      },
+      {
+        id: 24,
+        qTitle: "網路認識溫柔對象，急需幾萬救援！",
+        qDesc: "每日噓寒問暖，突發疾病或關口要錢！",
+        qIcon: "fa-face-smile-beam",
+        aTitle: "沒見過面的網路對象談錢就是騙！",
+        aDesc: "愛情詐騙常利用孤獨感，遇到談錢即封鎖！",
+        aIcon: "fa-user-slash"
+      },
+      {
+        id: 25,
+        qTitle: "假冒銀行簡訊：帳戶安全升級請驗證",
+        qDesc: "點入與真銀行一模一樣的網頁，偷走密碼！",
+        qIcon: "fa-building-columns",
+        aTitle: "自己開銀行官方App或臨櫃詢問",
+        aDesc: "銀行絕不會用簡訊要求輸入帳號密碼！",
+        aIcon: "fa-lock"
+      },
+      {
+        id: 26,
+        qTitle: "假冒勞保局：您的退休金算錯要退補",
+        qDesc: "要求提供銀行帳密或至指定提款機操作！",
+        qIcon: "fa-calculator",
+        aTitle: "撥打勞保局官方專線求證！",
+        aDesc: "勞保局補發款項會直接匯入綁定帳戶！",
+        aIcon: "fa-phone"
+      },
+      {
+        id: 27,
+        qTitle: "生前契約/塔位轉售，需先交手續費！",
+        qDesc: "宣稱有買家高價收購塔位，要先交代書費！",
+        qIcon: "fa-monument",
+        aTitle: "要求預先交錢的塔位買賣全是騙！",
+        aDesc: "不聽信地下仲介，尋求合法業者處理！",
+        aIcon: "fa-gavel"
+      },
+      {
+        id: 28,
+        qTitle: "免費試用助聽器，填問卷抽大獎！",
+        qDesc: "收集長者身分證與印章，私下申請高利貸款！",
+        qIcon: "fa-ear-listen",
+        aTitle: "絕不輕易提供身分證正本與印章！",
+        aDesc: "填問卷只需基本聯絡方式，勿給重要證件！",
+        aIcon: "fa-shield"
+      },
+      {
+        id: 29,
+        qTitle: "假老鄰居急用錢，催促馬上轉帳！",
+        qDesc: "聲稱在醫院急需現金，要你立刻匯款！",
+        qIcon: "fa-user-group",
+        aTitle: "親自登門或打原本電話核實！",
+        aDesc: "遇到親友臨時借錢，務必當面或原號確認！",
+        aIcon: "fa-people-arrows"
+      },
+      {
+        id: 30,
+        qTitle: "簡訊通知：您的綜合所得稅退稅通知",
+        qDesc: "附帶假的國稅局網址，要求輸入金融卡號！",
+        qIcon: "fa-receipt",
+        aTitle: "國稅局不會用簡訊指示退稅！",
+        aDesc: "退稅直接入帳或寄發支票，不上網填卡號！",
+        aIcon: "fa-file-shield"
+      },
+      {
+        id: 31,
+        qTitle: "免費樂齡課程，索取全家個資！",
+        qDesc: "上課後強行推銷高價保健品並要全家身分證！",
+        qIcon: "fa-child-reaching",
+        aTitle: "免費活動警惕推銷，不給戶籍個資",
+        aDesc: "參與社區活動保護隱私，拒絕高價推銷！",
+        aIcon: "fa-user-shield"
+      },
+      {
+        id: 32,
+        qTitle: "收到公私立停車場 QR Code 繳費貼紙",
+        qDesc: "柱子上的偽造 QR Code 掃描後扣款至詐騙帳號！",
+        qIcon: "fa-qrcode",
+        aTitle: "使用官方 App 或至管理室繳費！",
+        aDesc: "不隨意掃描公共場所來源不明的 QR Code！",
+        aIcon: "fa-barcode"
+      },
+      {
+        id: 33,
+        qTitle: "假醫師：急診手術需要自費保證金！",
+        qDesc: "電話宣稱兒女在急診，要求轉帳手術預付款！",
+        qIcon: "fa-truck-medical",
+        aTitle: "直撥醫院總機或兒女公司確認！",
+        aDesc: "醫院急救以救人為先，絕不會電話逼匯款！",
+        aIcon: "fa-hospital"
+      },
+      {
+        id: 34,
+        qTitle: "簡訊：超商點數即將失效，點擊兌換",
+        qDesc: "假的超商網站，騙取會員帳號與信用卡！",
+        qIcon: "fa-store",
+        aTitle: "開啟超商官方 App 兌換點數！",
+        aDesc: "不點簡訊連結，點數兌換認明官方應用程式！",
+        aIcon: "fa-mobile"
+      },
+      {
+        id: 35,
+        qTitle: "臉書超低價賣電動輔助車/輔具！",
+        qDesc: "市價數萬只賣三千，要求先轉帳預定！",
+        qIcon: "fa-wheelchair",
+        aTitle: "遠低於市價多是騙局！面交驗貨",
+        aDesc: "購買醫療輔具選擇實體門市，不上當！",
+        aIcon: "fa-shop"
+      },
+      {
+        id: 36,
+        qTitle: "LINE好友請求：幫忙買幾張遊戲點數卡",
+        qDesc: "朋友帳號被盜，假借急用要你幫去便利商店買卡！",
+        qIcon: "fa-gamepad",
+        aTitle: "幫買點數卡 100% 是詐騙！",
+        aDesc: "任何要求去超商買點數卡代付的都是騙子！",
+        aIcon: "fa-hand-dots"
+      },
+      {
+        id: 37,
+        qTitle: "免費樂齡健康檢查，要影印身分證印章",
+        qDesc: "非醫療機構辦理，偷偷拿去申辦人頭門號！",
+        qIcon: "fa-heart-pulse",
+        aTitle: "認明衛生所或醫院舉辦的健檢！",
+        aDesc: "不隨便將證件正影本交給非正規機構！",
+        aIcon: "fa-square-check"
+      },
+      {
+        id: 38,
+        qTitle: "簡訊通知：您的國道通行費逾期罰款",
+        qDesc: "要求線上輸入信用卡繳納 300 元罰鍰！",
+        qIcon: "fa-car",
+        aTitle: "下載遠通電收 App 查核真偽！",
+        aDesc: "不點簡訊網址，欠費直接由官方管道查詢！",
+        aIcon: "fa-circle-info"
+      },
+      {
+        id: 39,
+        qTitle: "網購賣家：誤設成批發商重複扣款！",
+        qDesc: "要求聯絡銀行取消，並操作網路銀行匯款！",
+        qIcon: "fa-bag-shopping",
+        aTitle: "網購平台絕不會要求操作網路銀行！",
+        aDesc: "接獲設定錯誤電話，直接掛斷不理會！",
+        aIcon: "fa-phone-slash"
+      },
+      {
+        id: 40,
+        qTitle: "信用卡防詐中心：您的卡片剛在國外刷卡",
+        qDesc: "要求提供簡訊驗證碼（OTP）來幫忙辦理止付！",
+        qIcon: "fa-credit-card",
+        aTitle: "簡訊驗證碼（OTP）就是資金密碼！",
+        aDesc: "銀行絕不會要你口頭報出 OTP 驗證碼！",
+        aIcon: "fa-key"
+      },
+      {
+        id: 41,
+        qTitle: "醫院/公共場合免費 Wi-Fi 假連線",
+        qDesc: "連上假 Wi-Fi 後輸入的任何密碼都被攔截！",
+        qIcon: "fa-wifi",
+        aTitle: "公共場合不輸入重要銀行帳密！",
+        aDesc: "登入網路銀行使用行動網路更安全！",
+        aIcon: "fa-shield-cat"
+      },
+      {
+        id: 42,
+        qTitle: "信箱收到刮刮卡中頭獎！需付過戶費",
+        qDesc: "傳單印刷精美，打電話去索取數萬元手續費！",
+        qIcon: "fa-ticket",
+        aTitle: "未買彩券卻中大獎一定是假的！",
+        aDesc: "實體信件刮中天價大獎多為傳統詐騙！",
+        aIcon: "fa-trash-can"
+      },
+      {
+        id: 43,
+        qTitle: "假地政事務所：您的房屋土地被申請過戶",
+        qDesc: "恐嚇地契有問題，要求交出房屋頭頭或暫存公署！",
+        qIcon: "fa-house-chimney",
+        aTitle: "開通地政「地籍異動即時通」免費服務！",
+        aDesc: "親自前往地政事務所查詢，不聽信來電！",
+        aIcon: "fa-house-lock"
+      },
+      {
+        id: 44,
+        qTitle: "假旅遊業者：敬老特惠行程，買一送一",
+        qDesc: "收取全額團費後旅行社倒閉或根本無此行程！",
+        qIcon: "fa-plane",
+        aTitle: "選擇有交觀甲執照的合法旅行社！",
+        aDesc: "確認旅行社履約保證險，保障旅遊安全！",
+        aIcon: "fa-passport"
+      },
+      {
+        id: 45,
+        qTitle: "簡訊通知：您的電信門號即將被停用",
+        qDesc: "附帶假的電信網站，要你線上綁定卡號扣款！",
+        qIcon: "fa-signal",
+        aTitle: "手機撥打電信官方客服求證！",
+        aDesc: "電信業者絕不會發簡訊要求線上刷卡！",
+        aIcon: "fa-headset"
+      },
+      {
+        id: 46,
+        qTitle: "假慈善機構：資助孤兒/流浪動物點連結",
+        qDesc: "設立偽造的捐款網頁，偷取每月定期扣款信用卡！",
+        qIcon: "fa-hand-holding-heart",
+        aTitle: "捐款選擇政府立案的知名慈善團體！",
+        aDesc: "不點來源不明的社群捐款連結！",
+        aIcon: "fa-circle-check"
+      },
+      {
+        id: 47,
+        qTitle: "假電器維修師傅，維修費隨口要上萬！",
+        qDesc: "搜尋引擎假官網維修電話，小毛病喊大修！",
+        qIcon: "fa-wrench",
+        aTitle: "翻看家電保證書上面的原廠電話！",
+        aDesc: "網路搜尋維修電話多有假冒原廠！",
+        aIcon: "fa-file-contract"
+      },
+      {
+        id: 48,
+        qTitle: "簡訊通知：您有一筆交通罰單已移送執行",
+        qDesc: "簡訊附帶假法務部執行署網址，催促線上繳錢！",
+        qIcon: "fa-triangle-exclamation",
+        aTitle: "認明 .gov.tw 結尾！或臨櫃查詢",
+        aDesc: "政府機關網址必定包含 .gov.tw！",
+        aIcon: "fa-building"
+      },
+      {
+        id: 49,
+        qTitle: "假借問路或借手機，暗中操作扣款！",
+        qDesc: "借手機打電話，暗中傳送小額付費驗證簡訊！",
+        qIcon: "fa-mobile-button",
+        aTitle: "熱心幫忙可代為撥號並開啟免持！",
+        aDesc: "不將個人手機完全交給陌生人拿走操作！",
+        aIcon: "fa-lock"
+      },
+      {
+        id: 50,
+        qTitle: "假冒檢察官：加LINE線上傳喚監管財產",
+        qDesc: "利用通訊軟體傳送假的「法務部傳票」照片！",
+        qIcon: "fa-file-invoice-dollar",
+        aTitle: "檢警不會用LINE傳公文或做筆錄！",
+        aDesc: "司法機關公文皆為郵差送達，絕不用 LINE！",
+        aIcon: "fa-shield-halved"
+      }
+    ];
+
+    /* 2. 全域狀態 */
+    let cardsData = [];           // 當前局別的 6 張卡片數據
+    let flippedCards = [];        // 目前翻開比對中的卡片 [{index, data}]
+    let matchedIndices = new Set(); // 永久答對保留的索引集合
+    let matchedPairs = 0;         // 完成組數 (0 ~ 3)
+    let ttsEnabled = true;        // 語音朗讀開關
+    let delayTimer = null;        // 配對失敗 5 秒蓋回計時器
+    let isProcessingMismatch = false; // 是否處於配對失敗等候狀態
+
+    /* 3. 語音朗讀控制 (Web Speech API) - 僅朗讀核心大字標題 */
+    function speakText(text, cancelPrevious = true) {
+      if (!ttsEnabled) return;
+      if ('speechSynthesis' in window) {
+        if (cancelPrevious) {
+          window.speechSynthesis.cancel();
+        }
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-TW';
+        utterance.rate = 0.95; // 語速適中偏慢，利於長者聽講
+        utterance.pitch = 1.0;
+        
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    /* 4. 音效系統 (Web Audio API) */
+    
+    // 【答對短音效】：雙音階清脆「叮咚♪」（E5 -> C6）
+    function playSuccessSound() {
+      if (!ttsEnabled) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+
+        // 第一聲：溫和中高音 (E5 - 659.25Hz)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(659.25, ctx.currentTime);
+        gain1.gain.setValueAtTime(0.35, ctx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(ctx.currentTime);
+        osc1.stop(ctx.currentTime + 0.22);
+
+        // 第二聲：清脆高音 (C6 - 1046.50Hz)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.12);
+        gain2.gain.setValueAtTime(0.45, ctx.currentTime + 0.12);
+        gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(ctx.currentTime + 0.12);
+        osc2.stop(ctx.currentTime + 0.55);
+      } catch (e) {
+        console.log('AudioContext error:', e);
+      }
+    }
+
+    // 【通關長音效】：澎湃歡慶勝利樂章 (Victory Fanfare 多音階和弦推進音效)
+    function playVictorySound() {
+      if (!ttsEnabled) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+
+        // 樂章音符數列：C5 -> E5 -> G5 -> C6 (強音長奏)
+        const notes = [
+          { freq: 523.25, time: 0.00, duration: 0.14 }, // C5
+          { freq: 659.25, time: 0.14, duration: 0.14 }, // E5
+          { freq: 783.99, time: 0.28, duration: 0.14 }, // G5
+          { freq: 1046.50, time: 0.44, duration: 0.85 } // C6 (長音)
+        ];
+
+        notes.forEach(note => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(note.freq, ctx.currentTime + note.time);
+          
+          gain.gain.setValueAtTime(0.4, ctx.currentTime + note.time);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + note.time + note.duration);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + note.time);
+          osc.stop(ctx.currentTime + note.time + note.duration);
+        });
+
+        // 為結尾 C6 鋪設豐富的和弦伴音 (E6 1318.51Hz & G6 1567.98Hz)
+        const chordNotes = [1318.51, 1567.98];
+        chordNotes.forEach(freq => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + 0.44);
+          
+          gain.gain.setValueAtTime(0.25, ctx.currentTime + 0.44);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.25);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + 0.44);
+          osc.stop(ctx.currentTime + 1.25);
+        });
+      } catch (e) {
+        console.log('Victory Audio error:', e);
+      }
+    }
+
+    function toggleTTS() {
+      ttsEnabled = !ttsEnabled;
+      const ttsText = document.getElementById('tts-text');
+      const ttsIcon = document.getElementById('tts-icon');
+      const ttsBtn = document.getElementById('tts-btn');
+
+      if (ttsEnabled) {
+        ttsText.innerText = '語音：開啟';
+        ttsIcon.className = 'fa-solid fa-volume-high text-xl';
+        ttsBtn.className = 'btn-senior bg-amber-400 hover:bg-amber-500 active:scale-95 text-slate-900 font-black text-base sm:text-lg px-4 py-2 rounded-xl flex items-center gap-2 shadow-md';
+        speakText("語音朗讀已開啟");
+      } else {
+        ttsText.innerText = '語音：關閉';
+        ttsIcon.className = 'fa-solid fa-volume-xmark text-xl';
+        ttsBtn.className = 'btn-senior bg-slate-400 hover:bg-slate-500 active:scale-95 text-white font-black text-base sm:text-lg px-4 py-2 rounded-xl flex items-center gap-2 shadow-md';
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      }
+    }
+
+    // 淨化發音內容：只朗讀核心大字標題，自動剝離 Emoji 與前綴標籤
+    function speakCardTitle(index) {
+      const card = cardsData[index];
+      if (!card) return;
+      
+      let cleanTitle = card.title
+        .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}🚨🛡️]/gu, '')
+        .replace(/^(詐騙陷阱|智慧防護)[:：]?/gi, '')
+        .trim();
+      
+      speakText(cleanTitle);
+    }
+
+    /* 5. 遊戲洗牌與開局邏輯 (從 50 題庫隨機抽 3 題) */
+    function restartGame() {
+      if (delayTimer) {
+        clearTimeout(delayTimer);
+        delayTimer = null;
+      }
+      isProcessingMismatch = false;
+      document.getElementById('delay-banner').classList.add('hidden');
+      
+      matchedPairs = 0;
+      matchedIndices.clear();
+      flippedCards = [];
+      document.getElementById('progress-text').innerText = '0';
+
+      cardsData = generateRandom3Pairs();
+      renderGrid();
+
+      speakText("防詐終結對對碰，換了新題目，請點擊卡片！");
+    }
+
+    function generateRandom3Pairs() {
+      const shuffledBank = [...scamBank].sort(() => 0.5 - Math.random());
+      const selected = shuffledBank.slice(0, 3);
+
+      let deck = [];
+      selected.forEach(item => {
+        deck.push({
+          pairId: item.id,
+          type: 'problem',
+          title: item.qTitle,
+          desc: item.qDesc,
+          icon: item.qIcon
+        });
+        deck.push({
+          pairId: item.id,
+          type: 'solution',
+          title: item.aTitle,
+          desc: item.aDesc,
+          icon: item.aIcon
+        });
+      });
+
+      return deck.sort(() => 0.5 - Math.random());
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('cards-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      cardsData.forEach((card, index) => {
+        const cardElem = document.createElement('div');
+        cardElem.className = 'card-perspective h-56 sm:h-64 md:h-72 w-full';
+        cardElem.innerHTML = `
+          <div id="card-${index}" class="card-inner" onclick="handleCardClick(${index})">
+            
+            <!-- 卡片正面 (蓋牌狀態) -->
+            <div class="card-front p-3 sm:p-4">
+              <div class="flex justify-between items-center text-xs sm:text-sm font-black opacity-90">
+                <span>防詐演練</span>
+                <i class="fa-solid fa-lock text-base"></i>
+              </div>
+              <div class="my-auto flex flex-col items-center gap-2">
+                <div class="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-full flex items-center justify-center text-3xl sm:text-4xl shadow-inner">
+                  <i class="fa-solid fa-shield-cat"></i>
+                </div>
+                <span class="text-xl sm:text-2xl font-black tracking-wider">翻開卡片</span>
+              </div>
+              <div class="text-xs sm:text-sm font-extrabold opacity-85">點擊查看內容</div>
+            </div>
+
+            <!-- 卡片背面 (翻開狀態) -->
+            <div class="card-back ${card.type === 'problem' ? 'card-problem' : 'card-solution'} p-3 sm:p-4">
+              
+              <!-- 頂部標籤與獨立喇叭播放鈕 -->
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs sm:text-sm font-black px-2.5 py-0.5 rounded-lg ${card.type === 'problem' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}">
+                  ${card.type === 'problem' ? '🚨 詐騙陷阱' : '🛡️ 智慧防護'}
+                </span>
+                
+                <button onclick="event.stopPropagation(); speakCardTitle(${index});" class="text-amber-900 bg-amber-200 hover:bg-amber-300 rounded-full w-9 h-9 flex items-center justify-center text-lg shadow active:scale-95" title="播放語音">
+                  <i class="fa-solid fa-volume-high"></i>
+                </button>
+              </div>
+
+              <!-- 大圖標區域 -->
+              <div class="my-auto py-1 flex items-center justify-center">
+                <i class="fa-solid ${card.icon} text-4xl sm:text-5xl ${card.type === 'problem' ? 'text-red-600' : 'text-emerald-600'}"></i>
+              </div>
+
+              <!-- 大字體標題區 (大字 20~24px) -->
+              <div class="mt-auto bg-white/95 p-2 rounded-xl border border-slate-100 shadow-sm text-center">
+                <h3 class="text-base sm:text-lg md:text-xl font-black text-slate-900 leading-tight mb-1">${card.title}</h3>
+                <p class="text-xs sm:text-sm font-bold text-slate-500 leading-tight">${card.desc}</p>
+              </div>
+
+            </div>
+
+          </div>
+        `;
+        grid.appendChild(cardElem);
+      });
+    }
+
+    /* 6. 翻牌動作與比對驗證 */
+    function handleCardClick(index) {
+      if (matchedIndices.has(index) || isProcessingMismatch) {
+        return;
+      }
+
+      if (flippedCards.length === 1 && flippedCards[0].index === index) {
+        return;
+      }
+
+      const cardElem = document.getElementById(`card-${index}`);
+      if (!cardElem) return;
+
+      cardElem.classList.add('flipped');
+      flippedCards.push({ index, data: cardsData[index] });
+
+      // 朗讀核心大標題
+      speakCardTitle(index);
+
+      if (flippedCards.length === 2) {
+        checkPair();
+      }
+    }
+
+    function checkPair() {
+      const [c1, c2] = flippedCards;
+
+      // 【配對成功】：ID 相符且為問題卡與解答卡組合
+      if (c1.data.pairId === c2.data.pairId && c1.data.type !== c2.data.type) {
+        // 1. 寫入 matchedIndices 永久保持正面狀態
+        matchedIndices.add(c1.index);
+        matchedIndices.add(c2.index);
+
+        // 2. 增加進度計數
+        matchedPairs++;
+        document.getElementById('progress-text').innerText = matchedPairs;
+
+        // 3. 加上綠色耀眼光芒外框
+        setTimeout(() => {
+          const card1Inner = document.getElementById(`card-${c1.index}`)?.querySelector('.card-back');
+          const card2Inner = document.getElementById(`card-${c2.index}`)?.querySelector('.card-back');
+          if (card1Inner) card1Inner.classList.add('matched-card');
+          if (card2Inner) card2Inner.classList.add('matched-card');
+        }, 300);
+
+        // 4. 播放「叮咚♪」清脆短音效
+        setTimeout(() => {
+          playSuccessSound();
+        }, 650);
+
+        flippedCards = [];
+
+        // 全數完成通關
+        if (matchedPairs === 3) {
+          setTimeout(() => {
+            playVictorySound(); // 播放澎湃歡慶勝利樂章
+            speakText("太棒了！恭喜您順利通關，榮獲防詐大師勳章！", false);
+            document.getElementById('victory-modal').classList.remove('hidden');
+          }, 1800);
+        }
+      } 
+      // 【配對失敗】：保留 5 秒供閱讀，並顯示「立刻蓋回卡片」按鈕
+      else {
+        isProcessingMismatch = true;
+        document.getElementById('delay-banner').classList.remove('hidden');
+
+        delayTimer = setTimeout(() => {
+          forceFlipBack();
+        }, 5000);
+      }
+    }
+
+    function forceFlipBack() {
+      if (delayTimer) {
+        clearTimeout(delayTimer);
+        delayTimer = null;
+      }
+      document.getElementById('delay-banner').classList.add('hidden');
+
+      if (flippedCards.length === 2) {
+        const [c1, c2] = flippedCards;
+        const elem1 = document.getElementById(`card-${c1.index}`);
+        const elem2 = document.getElementById(`card-${c2.index}`);
+        
+        if (elem1 && !matchedIndices.has(c1.index)) elem1.classList.remove('flipped');
+        if (elem2 && !matchedIndices.has(c2.index)) elem2.classList.remove('flipped');
+        
+        flippedCards = [];
+      }
+      isProcessingMismatch = false;
+    }
+
+    function closeVictoryModal() {
+      document.getElementById('victory-modal').classList.add('hidden');
+    }
+
+    /* 7. 初始化加載 */
+    function initApp() {
+      restartGame();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
+    window.addEventListener('load', initApp);
+  </script>
+</body>
+</html>
